@@ -68,22 +68,39 @@ public class SignUp {
     }
 
     private boolean registerUser(String userId, String password, String email) {
-        Connection con = DBConnection.getConnection();
-        if (con == null)
-            return false;
-
+        Connection con = null;
+        PreparedStatement stmt = null;
+        
         try {
-            String query = "INSERT INTO employee (user_id, password, email, first_name, last_name, position, date_of_joining) VALUES (?, ?, ?, '', '', '', CURDATE())";
-            PreparedStatement stmt = con.prepareStatement(query);
+            con = DBConnection.getConnection();
+            if (con == null) {
+                System.out.println("Database connection failed");
+                return false;
+            }
+            
+            // Simpler query with only required fields
+            String query = "INSERT INTO employee (user_id, password, email) VALUES (?, ?, ?)";
+            stmt = con.prepareStatement(query);
             stmt.setString(1, userId);
             stmt.setString(2, password);
             stmt.setString(3, email);
-
+    
             int rowsInserted = stmt.executeUpdate();
             return rowsInserted > 0;
         } catch (SQLException e) {
+            // More detailed error message
+            System.out.println("SQL Error in registration: " + e.getMessage());
+            JOptionPane.showMessageDialog(frame, "Registration Error: " + e.getMessage());
             e.printStackTrace();
+            return false;
+        } finally {
+            // Proper resource cleanup
+            try {
+                if (stmt != null) stmt.close();
+                if (con != null) con.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
         }
-        return false;
     }
 }

@@ -1,96 +1,73 @@
 package ui;
 
-import database.DBConnection;
-
-import javax.swing.*;
 import java.awt.*;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
+import javax.swing.*;
 
 public class Sign_in {
-    JFrame frame = new JFrame("Sign In");
+
+    JFrame frame1;
+    JTextField tt1;
+    JPasswordField tt2;
+    JButton loginButton, registerButton;
 
     public Sign_in() {
-        frame.setLayout(null);
-        frame.setSize(800, 600);
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame1 = new JFrame("Login");
+        frame1.setSize(400, 300);
+        frame1.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame1.setLayout(new GridLayout(5, 2, 10, 10));
 
-        JLabel label = new JLabel("Employee Payroll System", JLabel.CENTER);
-        label.setFont(new Font("Arial", Font.BOLD, 24));
-        label.setBounds(0, 25, 800, 50);
-        frame.add(label);
+        frame1.add(new JLabel("User ID:"));
+        tt1 = new JTextField();
+        frame1.add(tt1);
 
-        JLabel username = new JLabel("Username");
-        username.setFont(new Font("Arial", Font.BOLD, 18));
-        username.setBounds(200, 120, 100, 30);
-        frame.add(username);
+        frame1.add(new JLabel("Password:"));
+        tt2 = new JPasswordField();
+        frame1.add(tt2);
 
-        JTextField t1 = new JTextField();
-        t1.setBounds(310, 120, 200, 30);
-        frame.add(t1);
+        loginButton = new JButton("Login");
+        registerButton = new JButton("Register");
 
-        JLabel password = new JLabel("Password");
-        password.setFont(new Font("Arial", Font.BOLD, 18));
-        password.setBounds(200, 170, 100, 30);
-        frame.add(password);
+        frame1.add(loginButton);
+        frame1.add(registerButton);
 
-        JPasswordField t2 = new JPasswordField();
-        t2.setBounds(310, 170, 200, 30);
-        frame.add(t2);
-
-        JButton signin = new JButton("SIGN IN");
-        signin.setBounds(300, 250, 200, 30);
-        frame.add(signin);
-
-        signin.addActionListener(e -> {
-            String userId = t1.getText();
-            String pass = new String(t2.getPassword());
-
-            if (validateLogin(userId, pass)) {
-                JOptionPane.showMessageDialog(frame, "LOGIN SUCCESSFUL");
-                frame.dispose();
-                // Next Page Launch here (ex: DataEntryPage)
-            } else {
-                JOptionPane.showMessageDialog(frame, "Invalid Credentials");
-            }
-        });
-
-        JButton signup = new JButton("SIGN UP");
-        signup.setBounds(550, 500, 200, 30);
-        signup.addActionListener(e -> {
+        loginButton.addActionListener(e -> login());
+        registerButton.addActionListener(e -> {
+            frame1.dispose();
             new SignUp();
-            frame.dispose();
         });
-        frame.add(signup);
 
-        frame.setLocationRelativeTo(null);
-        frame.setVisible(true);
+        frame1.setLocationRelativeTo(null);
+        frame1.setVisible(true);
     }
 
-    private boolean validateLogin(String userId, String password) {
-        Connection con = DBConnection.getConnection();
-        if (con == null) {
-            JOptionPane.showMessageDialog(frame, "Database connection failed");
-            return false;
+    private void login() {
+        String userId = tt1.getText();
+        String password = new String(tt2.getPassword());
+
+        if (userId.isEmpty() || password.isEmpty()) {
+            JOptionPane.showMessageDialog(frame1, "Please fill all fields");
+            return;
         }
-        try {
-            String query = "SELECT * FROM employee WHERE user_id = ? AND password = ?";
-            PreparedStatement stmt = con.prepareStatement(query);
-            stmt.setString(1, userId);
-            stmt.setString(2, password);
 
-            ResultSet rs = stmt.executeQuery();
-            return rs.next(); // If record found, login success
+        try (Connection con = database.DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement("SELECT * FROM employee WHERE user_id = ? AND password = ?")) {
+            ps.setString(1, userId);
+            ps.setString(2, password);
 
-        } catch (SQLException e) {
-            e.printStackTrace();
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    JOptionPane.showMessageDialog(frame1, "LOGIN SUCCESSFUL");
+                    String email = rs.getString("email");
+                    frame1.dispose();
+                    new EmployeeDataEntryPage(userId, email, password);
+                } else {
+                    JOptionPane.showMessageDialog(frame1, "Invalid User ID or Password");
+                }
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            JOptionPane.showMessageDialog(frame1, "Database connection error: " + ex.getMessage());
         }
-        return false;
-    }
-
-    public static void main(String[] args) {
-        new Sign_in();
     }
 }

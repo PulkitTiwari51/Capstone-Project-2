@@ -1,28 +1,36 @@
 package ui;
 
+import java.awt.*;
+import javax.swing.*;
 import model.Employee;
 import model.Salary;
 import service.EmployeeService;
 import service.SalaryService;
-
-import javax.swing.*;
-import java.awt.*;
+import java.sql.*;
 
 public class EmployeeDataEntryPage {
 
     JFrame frame;
-    JTextField firstNameField, lastNameField, emailField, phoneField, positionField, userIdField, passwordField,
-            roleField;
+    JTextField firstNameField, lastNameField, phoneField, positionField;
     JTextField basicSalaryField, bonusField, overtimeField;
-    JButton submitButton;
+    JButton submitButton, saveButton, editButton;
+    boolean isEditable = false;
 
-    public EmployeeDataEntryPage() {
-        frame = new JFrame("Add New Employee");
-        frame.setSize(600, 700);
-        frame.setLayout(new GridLayout(14, 2, 10, 10));
+    private String userId;
+    private String email;
+    private String password;
+    private String role = "Employee";
+
+    public EmployeeDataEntryPage(String userId, String email, String password) {
+        this.userId = userId;
+        this.email = email;
+        this.password = password;
+
+        frame = new JFrame("Employee Data Entry");
+        frame.setSize(500, 700);
+        frame.setLayout(new GridLayout(12, 2, 10, 10));
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        // Employee Details
         frame.add(new JLabel("First Name:"));
         firstNameField = new JTextField();
         frame.add(firstNameField);
@@ -30,10 +38,6 @@ public class EmployeeDataEntryPage {
         frame.add(new JLabel("Last Name:"));
         lastNameField = new JTextField();
         frame.add(lastNameField);
-
-        frame.add(new JLabel("Email:"));
-        emailField = new JTextField();
-        frame.add(emailField);
 
         frame.add(new JLabel("Phone:"));
         phoneField = new JTextField();
@@ -43,19 +47,6 @@ public class EmployeeDataEntryPage {
         positionField = new JTextField();
         frame.add(positionField);
 
-        frame.add(new JLabel("User ID:"));
-        userIdField = new JTextField();
-        frame.add(userIdField);
-
-        frame.add(new JLabel("Password:"));
-        passwordField = new JTextField();
-        frame.add(passwordField);
-
-        frame.add(new JLabel("Role:"));
-        roleField = new JTextField("Employee"); // default role
-        frame.add(roleField);
-
-        // Salary Details
         frame.add(new JLabel("Basic Salary:"));
         basicSalaryField = new JTextField();
         frame.add(basicSalaryField);
@@ -64,79 +55,154 @@ public class EmployeeDataEntryPage {
         bonusField = new JTextField();
         frame.add(bonusField);
 
-        frame.add(new JLabel("Overtime:"));
+        frame.add(new JLabel("Overtime Hours:"));
         overtimeField = new JTextField();
         frame.add(overtimeField);
 
+        editButton = new JButton("Edit Info");
+        saveButton = new JButton("Save Info");
         submitButton = new JButton("Submit");
-        frame.add(new JLabel()); // Empty label for spacing
+
+        frame.add(editButton);
+        frame.add(saveButton);
         frame.add(submitButton);
 
-        submitButton.addActionListener(e -> {
-            addEmployeeWithSalary();
-        });
+        editButton.addActionListener(e -> enableEditing());
+        saveButton.addActionListener(e -> saveEmployeeData());
+        submitButton.addActionListener(e -> submitEmployeeData());
 
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
+
+        loadEmployeeData();
     }
 
-    private void addEmployeeWithSalary() {
+    private void enableEditing() {
+        setFieldsEditable(true);
+    }
+
+    private void setFieldsEditable(boolean editable) {
+        firstNameField.setEditable(editable);
+        lastNameField.setEditable(editable);
+        phoneField.setEditable(editable);
+        positionField.setEditable(editable);
+        basicSalaryField.setEditable(editable);
+        bonusField.setEditable(editable);
+        overtimeField.setEditable(editable);
+        isEditable = editable;
+    }
+
+    private void saveEmployeeData() {
         try {
-            Employee emp = new Employee();
-            emp.setFirstName(firstNameField.getText());
-            emp.setLastName(lastNameField.getText());
-            emp.setEmail(emailField.getText());
-            emp.setPhone(phoneField.getText());
-            emp.setPosition(positionField.getText());
-            emp.setUserId(userIdField.getText());
-            emp.setPassword(passwordField.getText());
-            emp.setRole(roleField.getText());
+            saveEmployeeAndSalary();
+            JOptionPane.showMessageDialog(frame, "Saved successfully!");
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(frame, "Error saving data: " + e.getMessage());
+        }
+    }
 
-            EmployeeService empService = new EmployeeService();
-            boolean empAdded = empService.addEmployee(emp);
+    private void submitEmployeeData() {
+        try {
+            saveEmployeeAndSalary();
+            JOptionPane.showMessageDialog(frame, "Saved successfully! Redirecting to Payslip...");
+            frame.dispose();
+            new PayslipViewPage(userId);
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(frame, "Error saving data: " + e.getMessage());
+        }
+    }
 
-            if (empAdded) {
-                Salary salary = new Salary();
-                salary.setEmpId(getEmployeeIdByUserId(emp.getUserId()));
-                salary.setBasicSalary(Double.parseDouble(basicSalaryField.getText()));
-                salary.setBonus(Double.parseDouble(bonusField.getText()));
-                salary.setOvertime(Double.parseDouble(overtimeField.getText()));
+    private void saveEmployeeAndSalary() throws Exception {
+        Employee emp = new Employee();
+        emp.setFirstName(firstNameField.getText());
+        emp.setLastName(lastNameField.getText());
+        emp.setEmail(email);
+        emp.setPhone(phoneField.getText());
+        emp.setPosition(positionField.getText());
+        emp.setUserId(userId);
+        emp.setPassword(password);
+        emp.setRole(role);
 
-                SalaryService salaryService = new SalaryService();
-                salaryService.addSalary(salary);
+        EmployeeService empService = new EmployeeService();
+        boolean empUpdated = empService.updateOrAddEmployee(emp);
 
-                JOptionPane.showMessageDialog(frame, "Employee and Salary added successfully!");
-                frame.dispose();
+        if (empUpdated) {
+            Salary salary = new Salary();
+            salary.setEmpId(getEmployeeIdByUserId(userId));
+            salary.setBasicSalary(Double.parseDouble(basicSalaryField.getText()));
+            salary.setBonus(Double.parseDouble(bonusField.getText()));
+            salary.setOvertime(Double.parseDouble(overtimeField.getText()));
+
+            SalaryService salaryService = new SalaryService();
+            salaryService.addOrUpdateSalary(salary);
+        } else {
+            throw new Exception("Employee save failed");
+        }
+    }
+
+    private void loadEmployeeData() {
+        try {
+            Connection con = database.DBConnection.getConnection();
+
+            String empQuery = "SELECT * FROM employee WHERE user_id = ?";
+            PreparedStatement empPs = con.prepareStatement(empQuery);
+            empPs.setString(1, userId);
+
+            ResultSet empRs = empPs.executeQuery();
+            if (empRs.next()) {
+                firstNameField.setText(empRs.getString("first_name"));
+                lastNameField.setText(empRs.getString("last_name"));
+                phoneField.setText(empRs.getString("phone"));
+                positionField.setText(empRs.getString("position"));
+                setFieldsEditable(false);
             } else {
-                JOptionPane.showMessageDialog(frame, "Error adding Employee. Please try again.");
+                setFieldsEditable(true);
             }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            JOptionPane.showMessageDialog(frame, "Invalid input. Please fill all fields correctly.");
+            empRs.close();
+            empPs.close();
+
+            int empId = getEmployeeIdByUserId(userId);
+            if (empId != -1) {
+                String salaryQuery = "SELECT * FROM salary WHERE emp_id = ?";
+                PreparedStatement salPs = con.prepareStatement(salaryQuery);
+                salPs.setInt(1, empId);
+
+                ResultSet salRs = salPs.executeQuery();
+                if (salRs.next()) {
+                    basicSalaryField.setText(String.valueOf(salRs.getDouble("basic_salary")));
+                    bonusField.setText(String.valueOf(salRs.getDouble("bonus")));
+                    overtimeField.setText(String.valueOf(salRs.getDouble("overtime")));
+                }
+                salRs.close();
+                salPs.close();
+            }
+
+            con.close();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
     private int getEmployeeIdByUserId(String userId) {
         try {
-            java.sql.Connection con = database.DBConnection.getConnection();
+            Connection con = database.DBConnection.getConnection();
             String query = "SELECT emp_id FROM employee WHERE user_id = ?";
-            java.sql.PreparedStatement ps = con.prepareStatement(query);
+            PreparedStatement ps = con.prepareStatement(query);
             ps.setString(1, userId);
+            ResultSet rs = ps.executeQuery();
 
-            java.sql.ResultSet rs = ps.executeQuery();
             if (rs.next()) {
                 return rs.getInt("emp_id");
             }
+
             rs.close();
             ps.close();
             con.close();
-        } catch (Exception ex) {
-            ex.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return -1;
-    }
-
-    public static void main(String[] args) {
-        new EmployeeDataEntryPage();
     }
 }

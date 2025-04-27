@@ -1,34 +1,49 @@
 package service;
 
-import database.DBConnection;
+import java.sql.*;
 import model.Employee;
-
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
 
 public class EmployeeService {
 
-    public boolean addEmployee(Employee emp) {
-        Connection con = DBConnection.getConnection();
-        if (con == null)
-            return false;
-        try {
-            String query = "INSERT INTO employee (first_name, last_name, email, phone, position, user_id, password, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-            PreparedStatement stmt = con.prepareStatement(query);
-            stmt.setString(1, emp.getFirstName());
-            stmt.setString(2, emp.getLastName());
-            stmt.setString(3, emp.getEmail());
-            stmt.setString(4, emp.getPhone());
-            stmt.setString(5, emp.getPosition());
-            stmt.setString(6, emp.getUserId());
-            stmt.setString(7, emp.getPassword());
-            stmt.setString(8, emp.getRole());
+    public boolean updateOrAddEmployee(Employee emp) {
+        try (Connection con = database.DBConnection.getConnection()) {
+            String checkQuery = "SELECT * FROM employee WHERE user_id = ?";
+            PreparedStatement checkPs = con.prepareStatement(checkQuery);
+            checkPs.setString(1, emp.getUserId());
+            ResultSet rs = checkPs.executeQuery();
 
-            int rowsInserted = stmt.executeUpdate();
-            return rowsInserted > 0;
+            if (rs.next()) {
+                // Already exists, so update
+                String updateQuery = "UPDATE employee SET first_name=?, last_name=?, phone=?, position=?, email=?, password=?, role=? WHERE user_id=?";
+                PreparedStatement updatePs = con.prepareStatement(updateQuery);
+                updatePs.setString(1, emp.getFirstName());
+                updatePs.setString(2, emp.getLastName());
+                updatePs.setString(3, emp.getPhone());
+                updatePs.setString(4, emp.getPosition());
+                updatePs.setString(5, emp.getEmail());
+                updatePs.setString(6, emp.getPassword());
+                updatePs.setString(7, emp.getRole());
+                updatePs.setString(8, emp.getUserId());
 
-        } catch (SQLException e) {
+                int rows = updatePs.executeUpdate();
+                return rows > 0;
+            } else {
+                // New insert
+                String insertQuery = "INSERT INTO employee (first_name, last_name, phone, position, email, password, role, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                PreparedStatement insertPs = con.prepareStatement(insertQuery);
+                insertPs.setString(1, emp.getFirstName());
+                insertPs.setString(2, emp.getLastName());
+                insertPs.setString(3, emp.getPhone());
+                insertPs.setString(4, emp.getPosition());
+                insertPs.setString(5, emp.getEmail());
+                insertPs.setString(6, emp.getPassword());
+                insertPs.setString(7, emp.getRole());
+                insertPs.setString(8, emp.getUserId());
+
+                int rows = insertPs.executeUpdate();
+                return rows > 0;
+            }
+        } catch (Exception e) {
             e.printStackTrace();
             return false;
         }
